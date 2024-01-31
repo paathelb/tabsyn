@@ -75,7 +75,7 @@ def main(args):
     model_save_path = f'{ckpt_dir}/model.pt'
     encoder_save_path = f'{ckpt_dir}/encoder.pt'
     decoder_save_path = f'{ckpt_dir}/decoder.pt'
-    import pdb; pdb.set_trace()
+    
     X_num, X_cat, categories, d_numerical = preprocess(data_dir, task_type = info['task_type'])     # preprocess the tabular data
 
     X_train_num, _ = X_num
@@ -109,8 +109,9 @@ def main(args):
 
     import pdb; pdb.set_trace()
     # changed by HP
+    load_ckpt = False
     model_checkpoint_path = '/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/original/model.pt'
-    if os.path.isfile(model_checkpoint_path):
+    if load_ckpt and os.path.isfile(model_checkpoint_path):
         print("NOTE: LOADING TRAINED MODEL CHECKPOINT")
         model.load_state_dict(torch.load(model_checkpoint_path))
 
@@ -123,7 +124,7 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WD)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.95, patience=10, verbose=True)
 
-    num_epochs = 0 #4000    # changed by HP
+    num_epochs = 4000    # changed by HP
     best_train_loss = float('inf')
 
     current_lr = optimizer.param_groups[0]['lr']

@@ -51,11 +51,14 @@ def compute_loss(X_num, X_cat, Recon_X_num, Recon_X_cat, mu_z, logvar_z, mu_pret
 
     # Deviation from Major Distribution Loss            # changed by HP
     mu_pretrained = mu_pretrained.unsqueeze(0).repeat(mu_z.shape[0],1,1)
+    std_factor = 3
+    # import pdb; pdb.set_trace()
     if label is not None:
-        dmd_loss = torch.max(3 * std_pretrained - torch.abs(mu_z-mu_pretrained), torch.zeros_like(mu_z)) * label.unsqueeze(1).unsqueeze(2).repeat(1,mu_pretrained.shape[1],1)
-        dmd_loss += torch.max(torch.abs(mu_z-mu_pretrained) - 1 * std_pretrained, torch.zeros_like(mu_z)) * (label==0).unsqueeze(1).unsqueeze(2).repeat(1,mu_pretrained.shape[1],1)
+        # Why not norm .mean()
+        dmd_loss = torch.max(std_factor * std_pretrained.mean() - torch.norm(mu_z-mu_pretrained, p=2, dim=(1,2), keepdim=True).mean(), torch.zeros_like(mu_z)) * label.unsqueeze(1).unsqueeze(2).repeat(1,mu_pretrained.shape[1],1)
+        dmd_loss += torch.max(torch.norm(mu_z-mu_pretrained, p=2, dim=(1,2), keepdim=True).mean() - std_factor * std_pretrained.mean(), torch.zeros_like(mu_z)) * (label==0).unsqueeze(1).unsqueeze(2).repeat(1,mu_pretrained.shape[1],1)
     else:
-        dmd_loss = torch.max(3 * std_pretrained - torch.abs(mu_z-mu_pretrained), torch.zeros_like(mu_z)) * label.unsqueeze(1).unsqueeze(2).repeat(1,mu_pretrained.shape[1],1)
+        dmd_loss = torch.max(std_factor * std_pretrained.mean() - torch.norm(mu_z-mu_pretrained, p=2, dim=(1,2), keepdim=True).mean(), torch.zeros_like(mu_z))
     dmd_loss = dmd_loss.mean()
 
     return mse_loss, ce_loss, loss_kld, acc, dmd_loss
@@ -117,7 +120,7 @@ def main(args):
     model = model.to(device)
 
     # changed by HP
-    model_checkpoint_path = '/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/major_finetune_on_minor/model.pt'                    # hard coded
+    model_checkpoint_path = '/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/major_only/model.pt'                    # hard coded
     if os.path.isfile(model_checkpoint_path):
         print("LOADING MODEL CHECKPOINT")
         model.load_state_dict(torch.load(model_checkpoint_path))
@@ -135,7 +138,7 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WD)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.95, patience=10, verbose=True)
 
-    num_epochs = 0      #4000 #changed 
+    num_epochs = 4000           #changed 
     best_train_loss = float('inf')
 
     current_lr = optimizer.param_groups[0]['lr']
@@ -143,7 +146,7 @@ def main(args):
 
     beta = max_beta
     start_time = time.time()
-    ignore_target = False # changed by HP
+    ignore_target = False      # changed by HP
     for epoch in range(num_epochs):
         pbar = tqdm(train_loader, total=len(train_loader))
         pbar.set_description(f"Epoch {epoch+1}/{num_epochs}")
@@ -221,7 +224,7 @@ def main(args):
                 val_mse_loss, val_ce_loss, val_kl_loss, val_acc, val_dmd_loss = compute_loss(X_test_num, X_test_cat[:,1:], Recon_X_num, Recon_X_cat, mu_z, std_z, mu_pretrained, std_pretrained, X_test_cat[:,0])
             else:
                 Recon_X_num, Recon_X_cat, mu_z, std_z = model(X_test_num, X_test_cat)
-                val_mse_loss, val_ce_loss, val_kl_loss, val_acc, val_dmd_loss = compute_loss(X_test_num, X_test_cat, Recon_X_num, Recon_X_cat, mu_z, std_z, mu_pretrained, std_pretrained, X_test_cat)
+                val_mse_loss, val_ce_loss, val_kl_loss, val_acc, val_dmd_loss = compute_loss(X_test_num, X_test_cat, Recon_X_num, Recon_X_cat, mu_z, std_z, mu_pretrained, std_pretrained)
             val_loss = val_mse_loss.item() * 0 + val_ce_loss.item()
 
             scheduler.step(val_loss)

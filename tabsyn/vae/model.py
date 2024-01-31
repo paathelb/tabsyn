@@ -225,8 +225,8 @@ class Transformer(nn.Module):
         for layer_idx, layer in enumerate(self.layers):
             is_last_layer = layer_idx + 1 == len(self.layers)
 
-            x_residual = self._start_residual(x, layer, 0)
-            x_residual = layer['attention'](
+            x_residual = self._start_residual(x, layer, 0)      # unchanged at first
+            x_residual = layer['attention'](        # self-attention?
                 # for the last attention, it is enough to process only [CLS]
                 x_residual,
                 x_residual,
@@ -340,7 +340,7 @@ class Model_VAE(nn.Module):
         super(Model_VAE, self).__init__()
 
         self.VAE = VAE(d_numerical, categories, num_layers, d_token, n_head = n_head, factor = factor, bias = bias)
-        self.Reconstructor = Reconstructor(d_numerical, categories, d_token)        # is this the decoder?
+        self.Reconstructor = Reconstructor(d_numerical, categories, d_token)            # is this the decoder?
 
     def get_embedding(self, x_num, x_cat):
         x = self.Tokenizer(x_num, x_cat)
@@ -348,7 +348,7 @@ class Model_VAE(nn.Module):
 
     def forward(self, x_num, x_cat):
 
-        h, mu_z, std_z = self.VAE(x_num, x_cat)
+        h, mu_z, std_z = self.VAE(x_num, x_cat) # B x 24 x 4
 
         # recon_x_num, recon_x_cat = self.Reconstructor(h[:, 1:])
         recon_x_num, recon_x_cat = self.Reconstructor(h)
