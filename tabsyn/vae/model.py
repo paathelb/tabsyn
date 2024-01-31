@@ -45,7 +45,7 @@ class Tokenizer(nn.Module):
             [torch.ones(len(x_some), 1, device=x_some.device)]  # [CLS]
             + ([] if x_num is None else [x_num]),
             dim=1,
-        )
+        )       # TODO what is the purpose of the first columns of 1?
     
         x = self.weight[None] * x_num[:, :, None]
 
@@ -291,16 +291,16 @@ class VAE(nn.Module):
         return mu + eps * std
 
     def forward(self, x_num, x_cat):
-        x = self.Tokenizer(x_num, x_cat)
+        x = self.Tokenizer(x_num, x_cat)        # 4096x25x4
 
-        mu_z = self.encoder_mu(x)
-        std_z = self.encoder_logvar(x)
+        mu_z = self.encoder_mu(x)               # 4096x25x4 real
+        std_z = self.encoder_logvar(x)          # 4096x25x4 real
 
-        z = self.reparameterize(mu_z, std_z)
+        z = self.reparameterize(mu_z, std_z)    # 4096x25x4
 
         
         batch_size = x_num.size(0)
-        h = self.decoder(z[:,1:])
+        h = self.decoder(z[:,1:])               # 4096x24x4
         
         return h, mu_z, std_z
 
@@ -330,7 +330,7 @@ class Reconstructor(nn.Module):
 
         for i, recon in enumerate(self.cat_recons):
       
-            recon_x_cat.append(recon(h_cat[:, i]))
+            recon_x_cat.append(recon(h_cat[:, i]))  # Linear
 
         return recon_x_num, recon_x_cat
 
@@ -340,7 +340,7 @@ class Model_VAE(nn.Module):
         super(Model_VAE, self).__init__()
 
         self.VAE = VAE(d_numerical, categories, num_layers, d_token, n_head = n_head, factor = factor, bias = bias)
-        self.Reconstructor = Reconstructor(d_numerical, categories, d_token)
+        self.Reconstructor = Reconstructor(d_numerical, categories, d_token)        # is this the decoder?
 
     def get_embedding(self, x_num, x_cat):
         x = self.Tokenizer(x_num, x_cat)
@@ -353,7 +353,7 @@ class Model_VAE(nn.Module):
         # recon_x_num, recon_x_cat = self.Reconstructor(h[:, 1:])
         recon_x_num, recon_x_cat = self.Reconstructor(h)
 
-        return recon_x_num, recon_x_cat, mu_z, std_z
+        return recon_x_num, recon_x_cat, mu_z, std_z        # 4096x14x4, 4096x10x4, 4096x25x4, 4096x25x4
 
 
 class Encoder_model(nn.Module):

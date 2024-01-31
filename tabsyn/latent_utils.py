@@ -67,7 +67,7 @@ def get_input_generate(args):
 
  
 @torch.no_grad()
-def split_num_cat_target(syn_data, info, num_inverse, cat_inverse):
+def split_num_cat_target(syn_data, info, num_inverse, cat_inverse, synthesize_target=False, set_all_targets=None):
     task_type = info['task_type']
 
     num_col_idx = info['num_col_idx']
@@ -80,24 +80,23 @@ def split_num_cat_target(syn_data, info, num_inverse, cat_inverse):
     if task_type == 'regression':
         n_num_feat += len(target_col_idx)
     else:
-        n_cat_feat += len(target_col_idx)
+        n_cat_feat += len(target_col_idx)       # The label is considered a cat feat? changed by HP
 
   
-    pre_decoder = info['pre_decoder'].cuda()
-    token_dim = info['token_dim']
+    pre_decoder = info['pre_decoder'].cuda()    # Use the decoder to decode? changed by HP
+    token_dim = info['token_dim'] #4
 
-    syn_data = syn_data.reshape(syn_data.shape[0], -1, token_dim)
-    norm_input = pre_decoder(torch.tensor(syn_data).cuda())
+    syn_data = syn_data.reshape(syn_data.shape[0], -1, token_dim)   #27000x24x4
+    norm_input = pre_decoder(torch.tensor(syn_data).cuda()) # len 2, (27000x1, len 10)  # How was the pre_decoder trained? changed by HP
     x_hat_num, x_hat_cat = norm_input
 
     syn_cat = []
     for pred in x_hat_cat:
         syn_cat.append(pred.argmax(dim = -1))
 
-    syn_num = x_hat_num.cpu().numpy()
-    syn_cat = torch.stack(syn_cat).t().cpu().numpy()
-
-    syn_num = num_inverse(syn_num)
+    syn_num = x_hat_num.cpu().numpy()   # 27000x14
+    syn_cat = torch.stack(syn_cat).t().cpu().numpy() # 27000x10
+    syn_num = num_inverse(syn_num)      # from normal/uni to original data scale
     syn_cat = cat_inverse(syn_cat)
 
     if info['task_type'] == 'regression':
@@ -106,9 +105,18 @@ def split_num_cat_target(syn_data, info, num_inverse, cat_inverse):
     
     else:
         print(syn_cat.shape)
-        syn_target = syn_cat[:, :len(target_col_idx)]
-        syn_cat = syn_cat[:, len(target_col_idx):]
-
+        # changed by HP
+        if synthesize_target:
+            syn_target = syn_cat[:, :len(target_col_idx)]   # 27000 x 1 
+            syn_cat = syn_cat[:, len(target_col_idx):]
+        else:
+            if set_all_targets == None:
+                syn_target = np.zeros_like(syn_cat[:, :len(target_col_idx)])        #np.ones_like(syn_cat[:, :len(target_col_idx)])
+            elif set_all_targets == 0:
+                syn_target = np.zeros_like(syn_cat[:, :len(target_col_idx)])        #np.ones_like(syn_cat[:, :len(target_col_idx)])
+            elif set_all_targets == 1:
+                syn_target = np.ones_like(syn_cat[:, :len(target_col_idx)])        #np.ones_like(syn_cat[:, :len(target_col_idx)])
+        
     return syn_num, syn_cat, syn_target
 
 def recover_data(syn_num, syn_cat, syn_target, info):

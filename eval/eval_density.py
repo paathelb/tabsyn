@@ -77,9 +77,9 @@ if __name__ == '__main__':
     with open(f'{data_dir}/info.json', 'r') as f:
         info = json.load(f)
 
-    syn_data = pd.read_csv(syn_path)
-    real_data = pd.read_csv(real_path)
-
+    syn_data = pd.read_csv(syn_path)    # 3000x24
+    real_data = pd.read_csv(real_path)  # 27000x24
+    
     save_dir = f'eval/density/{dataname}/{model}'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -90,8 +90,8 @@ if __name__ == '__main__':
     metadata = info['metadata']
     metadata['columns'] = {int(key): value for key, value in metadata['columns'].items()}
 
-    new_real_data, new_syn_data, metadata = reorder(real_data, syn_data, info)
-
+    new_real_data, new_syn_data, metadata = reorder(real_data, syn_data, info)  # 27000x24, 3000x24
+    import pdb; pdb.set_trace()
     qual_report = QualityReport()
     qual_report.generate(new_real_data, new_syn_data, metadata)
 

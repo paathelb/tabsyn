@@ -11,6 +11,7 @@ from baselines.stasy.sample import main as sample_stasy
 from baselines.tabddpm.main_sample import main as sample_tabddpm
 
 from tabsyn.vae.main import main as train_vae
+from tabsyn.vae.finetune import main as finetune_vae    # changed by HP
 from tabsyn.main import main as train_tabsyn
 from tabsyn.sample import main as sample_tabsyn
 
@@ -18,7 +19,7 @@ import argparse
 import importlib
 
 def execute_function(method, mode):
-    if method == 'vae':
+    if method == 'vae' and mode==None:
         mode = 'train'
 
     main_fn = eval(f'{mode}_{method}')
@@ -116,6 +117,9 @@ def get_args():
 
     # Sampling
     parser.add_argument('--sample_step', type=int, default=2000, help='frequency of sampling')
+    # changed by HP
+    parser.add_argument('--stop_syn_target', action='store_false', help='whether to synthesize target or not')
+    parser.add_argument('--set_all_targets', type=int, default=None, help='set all targets to this value')
 
     # Continuous diffusion model
     parser.add_argument('--mean_type', type=str, default='epsilon', choices=['xprev', 'xstart', 'epsilon'], help='predict variable')

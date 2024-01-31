@@ -97,7 +97,7 @@ class FourierEmbedding(torch.nn.Module):
 class MLPDiffusion(nn.Module):
     def __init__(self, d_in, dim_t = 512):
         super().__init__()
-        self.dim_t = dim_t
+        self.dim_t = dim_t      # 1024
 
         self.proj = nn.Linear(d_in, dim_t)
 
@@ -177,4 +177,4 @@ class Model(nn.Module):
     def forward(self, x):
 
         loss = self.loss_fn(self.denoise_fn_D, x)
-        return loss.mean(-1).mean()
+        return loss.mean(-1).mean() # single value

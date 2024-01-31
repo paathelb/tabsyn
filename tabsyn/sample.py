@@ -16,11 +16,11 @@ def main(args):
     device = args.device
     steps = args.steps
     save_path = args.save_path
-
-    train_z, _, _, ckpt_path, info, num_inverse, cat_inverse = get_input_generate(args)
+    
+    train_z, _, _, ckpt_path, info, num_inverse, cat_inverse = get_input_generate(args) # 27000x96
     in_dim = train_z.shape[1] 
 
-    mean = train_z.mean(0)
+    mean = train_z.mean(0)      # 96
 
     denoise_fn = MLPDiffusion(in_dim, 1024).to(device)
     
@@ -33,16 +33,21 @@ def main(args):
     '''
     start_time = time.time()
 
-    num_samples = train_z.shape[0]
+    num_samples = train_z.shape[0]      #27000
     sample_dim = in_dim
+    
+    x_next = sample(model.denoise_fn_D, num_samples, sample_dim)    # sampling with 50 steps
+    x_next = x_next * 2 + mean.to(device)       # 27000x96  # add to the mean of the input latent variable z?
 
-    x_next = sample(model.denoise_fn_D, num_samples, sample_dim)
-    x_next = x_next * 2 + mean.to(device)
-
-    syn_data = x_next.float().cpu().numpy()
-    syn_num, syn_cat, syn_target = split_num_cat_target(syn_data, info, num_inverse, cat_inverse) 
-
-    syn_df = recover_data(syn_num, syn_cat, syn_target, info)
+    syn_data = x_next.float().cpu().numpy()     # 27000x96
+    import pdb; pdb.set_trace()
+    # changed by HP
+    syn_target = args.stop_syn_target   # set True by default unless flag is raised
+    set_all_targets = args.set_all_targets
+    syn_num, syn_cat, syn_target = split_num_cat_target(syn_data, info, num_inverse, cat_inverse, syn_target, set_all_targets) 
+    
+    syn_df = recover_data(syn_num, syn_cat, syn_target, info)   # 27000 x 14
+    # terminal code: syn_df.to_numpy()[syn_df.to_numpy()[:,-1]==0][:,info['num_col_idx']].astype(float).std(0)
 
     idx_name_mapping = info['idx_name_mapping']
     idx_name_mapping = {int(key): value for key, value in idx_name_mapping.items()}

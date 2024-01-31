@@ -218,8 +218,8 @@ def prepare_ml_problem(train, test, info):
     # test_X, test_y, label_encoder, encoders = feat_transform(test, info)
     # train_X, train_y, _, _ = feat_transform(train, info, label_encoder, encoders)
     
-    train_X, train_y, label_encoder, encoders, cmax, cmin = feat_transform(train, info)
-    test_X, test_y, _, _ , _, _ = feat_transform(test, info, label_encoder, encoders, cmax, cmin)
+    train_X, train_y, label_encoder, encoders, cmax, cmin = feat_transform(train, info)             # 27000x84, 27000
+    test_X, test_y, _, _ , _, _ = feat_transform(test, info, label_encoder, encoders, cmax, cmin)   # 3000x84, 3000
 
     total_train_num = train_X.shape[0]
     val_num = int(total_train_num / 9)
@@ -353,7 +353,7 @@ def _evaluate_multi_classification(train, test, info):
 
         unique_labels = np.unique(y_trains)
 
-        param_set = list(ParameterGrid(model_kwargs))
+        param_set = list(ParameterGrid(model_kwargs))   # creating combination of parameters
 
         results = []
         for param in tqdm(param_set):
@@ -485,7 +485,7 @@ def _evaluate_multi_classification(train, test, info):
 
 @ignore_warnings(category=ConvergenceWarning)
 def _evaluate_binary_classification(train, test, info):
-    x_trains, y_trains, x_valid, y_valid, x_test, y_test, classifiers = prepare_ml_problem(train, test, info)
+    x_trains, y_trains, x_valid, y_valid, x_test, y_test, classifiers = prepare_ml_problem(train, test, info)   #24000x91, 24000, 3000x91, 3000, 3000x91, 3000 
 
     unique_labels = np.unique(y_trains)
 

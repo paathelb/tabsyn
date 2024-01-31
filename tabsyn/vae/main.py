@@ -28,17 +28,16 @@ FACTOR = 32
 NUM_LAYERS = 2
 
 
-def compute_loss(X_num, X_cat, Recon_X_num, Recon_X_cat, mu_z, logvar_z):
+def compute_loss(X_num, X_cat, Recon_X_num, Recon_X_cat, mu_z, logvar_z):   #4096x14, 4096x10, 4096x14, 4096x10, 4096x25x4, 4096x25x4
     ce_loss_fn = nn.CrossEntropyLoss()
     mse_loss = (X_num - Recon_X_num).pow(2).mean()
     ce_loss = 0
     acc = 0
     total_num = 0
-
     for idx, x_cat in enumerate(Recon_X_cat):
         if x_cat is not None:
-            ce_loss += ce_loss_fn(x_cat, X_cat[:, idx])
-            x_hat = x_cat.argmax(dim = -1)
+            ce_loss += ce_loss_fn(x_cat, X_cat[:, idx]) # single value
+            x_hat = x_cat.argmax(dim = -1)      # 4096
         acc += (x_hat == X_cat[:,idx]).float().sum()
         total_num += x_hat.shape[0]
     
@@ -76,14 +75,14 @@ def main(args):
     model_save_path = f'{ckpt_dir}/model.pt'
     encoder_save_path = f'{ckpt_dir}/encoder.pt'
     decoder_save_path = f'{ckpt_dir}/decoder.pt'
-
-    X_num, X_cat, categories, d_numerical = preprocess(data_dir, task_type = info['task_type'])
+    import pdb; pdb.set_trace()
+    X_num, X_cat, categories, d_numerical = preprocess(data_dir, task_type = info['task_type'])     # preprocess the tabular data
 
     X_train_num, _ = X_num
     X_train_cat, _ = X_cat
 
-    X_train_num, X_test_num = X_num
-    X_train_cat, X_test_cat = X_cat
+    X_train_num, X_test_num = X_num     # 27000x14, 3000x14 for 'default'
+    X_train_cat, X_test_cat = X_cat     # 27000x10, 3000x10 for 'default'
 
     # X_train_num = torch.tensor(X_train_num).float()
     # X_train_cat =  torch.tensor(X_train_cat)
@@ -108,6 +107,13 @@ def main(args):
     model = Model_VAE(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR, bias = True)
     model = model.to(device)
 
+    import pdb; pdb.set_trace()
+    # changed by HP
+    model_checkpoint_path = '/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/original/model.pt'
+    if os.path.isfile(model_checkpoint_path):
+        print("NOTE: LOADING TRAINED MODEL CHECKPOINT")
+        model.load_state_dict(torch.load(model_checkpoint_path))
+
     pre_encoder = Encoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR).to(device)
     pre_decoder = Decoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR).to(device)
 
@@ -117,7 +123,7 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WD)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.95, patience=10, verbose=True)
 
-    num_epochs = 4000
+    num_epochs = 0 #4000    # changed by HP
     best_train_loss = float('inf')
 
     current_lr = optimizer.param_groups[0]['lr']
@@ -125,6 +131,7 @@ def main(args):
 
     beta = max_beta
     start_time = time.time()
+    
     for epoch in range(num_epochs):
         pbar = tqdm(train_loader, total=len(train_loader))
         pbar.set_description(f"Epoch {epoch+1}/{num_epochs}")
@@ -135,16 +142,16 @@ def main(args):
 
         curr_count = 0
 
-        for batch_num, batch_cat in pbar:
+        for batch_num, batch_cat in pbar:           # 4096x14, 4096x10
             model.train()
             optimizer.zero_grad()
 
             batch_num = batch_num.to(device)
             batch_cat = batch_cat.to(device)
 
-            Recon_X_num, Recon_X_cat, mu_z, std_z = model(batch_num, batch_cat)
-        
-            loss_mse, loss_ce, loss_kld, train_acc = compute_loss(batch_num, batch_cat, Recon_X_num, Recon_X_cat, mu_z, std_z)
+            Recon_X_num, Recon_X_cat, mu_z, std_z = model(batch_num, batch_cat) # 4096x14 #len 10 # 4096x25x4 # 4096x25x4
+            
+            loss_mse, loss_ce, loss_kld, train_acc = compute_loss(batch_num, batch_cat, Recon_X_num, Recon_X_cat, mu_z, std_z)  # single values
 
             loss = loss_mse + loss_ce + beta * loss_kld
             loss.backward()
@@ -184,7 +191,7 @@ def main(args):
                     beta = beta * lambd
 
         '''
-            Evaluation
+            Evaluation (changed by HP: every epoch?)
         '''
         model.eval()
         with torch.no_grad():
@@ -213,7 +220,7 @@ def main(args):
         X_train_cat = X_train_cat.to(device)
 
         print('Successfully load and save the model!')
-
+        import pdb; pdb.set_trace() 
         train_z = pre_encoder(X_train_num, X_train_cat).detach().cpu().numpy()
 
         np.save(f'{ckpt_dir}/train_z.npy', train_z)

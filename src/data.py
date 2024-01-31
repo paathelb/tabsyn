@@ -415,7 +415,7 @@ def transform_dataset(
         # assert transformations.cat_encoding is None
         X_cat = None
     else:
-        X_cat = cat_process_nans(dataset.X_cat, transformations.cat_nan_policy)
+        X_cat = cat_process_nans(dataset.X_cat, transformations.cat_nan_policy)     # dataset.X_cat here has target #changed by HP
    
         if transformations.cat_min_frequency is not None:
             X_cat = cat_drop_rare(X_cat, transformations.cat_min_frequency)

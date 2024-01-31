@@ -20,31 +20,31 @@ S_max=float('inf')
 S_noise=1
 
 def sample(net, num_samples, dim, num_steps = 50, device = 'cuda:0'):
-    latents = torch.randn([num_samples, dim], device=device)
+    latents = torch.randn([num_samples, dim], device=device)    # 27000x96  # This is the noise?
 
-    step_indices = torch.arange(num_steps, dtype=torch.float32, device=latents.device)
+    step_indices = torch.arange(num_steps, dtype=torch.float32, device=latents.device) # len 50
 
     sigma_min = max(SIGMA_MIN, net.sigma_min)
     sigma_max = min(SIGMA_MAX, net.sigma_max)
 
     t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (
-                sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
-    t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
+                sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho    # len 50
+    t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])  # len 51
 
     x_next = latents.to(torch.float32) * t_steps[0]
 
     with torch.no_grad():
         for i, (t_cur, t_next) in enumerate(zip(t_steps[:-1], t_steps[1:])):
-            x_next = sample_step(net, num_steps, i, t_cur, t_next, x_next)
+            x_next = sample_step(net, num_steps, i, t_cur, t_next, x_next)      # 27000x96
 
     return x_next
 
 def sample_step(net, num_steps, i, t_cur, t_next, x_next):
 
-    x_cur = x_next
+    x_cur = x_next      # 27000x96
     # Increase noise temporarily.
-    gamma = min(S_churn / num_steps, np.sqrt(2) - 1) if S_min <= t_cur <= S_max else 0
-    t_hat = net.round_sigma(t_cur + gamma * t_cur) 
+    gamma = min(S_churn / num_steps, np.sqrt(2) - 1) if S_min <= t_cur <= S_max else 0 #S_churn=1
+    t_hat = net.round_sigma(t_cur + gamma * t_cur)  # MLPDiffusion + Positional Embedding + Time Embed
     x_hat = x_cur + (t_hat ** 2 - t_cur ** 2).sqrt() * S_noise * randn_like(x_cur)
     # Euler step.
 
@@ -58,7 +58,7 @@ def sample_step(net, num_steps, i, t_cur, t_next, x_next):
         d_prime = (x_next - denoised) / t_next
         x_next = x_hat + (t_next - t_hat) * (0.5 * d_cur + 0.5 * d_prime)
 
-    return x_next
+    return x_next       # 27000x96
 
 class VPLoss:
     def __init__(self, beta_d=19.9, beta_min=0.1, epsilon_t=1e-5):
@@ -141,8 +141,8 @@ class VELoss:
 
 class EDMLoss:
     def __init__(self, P_mean=-1.2, P_std=1.2, sigma_data=0.5, hid_dim = 100, gamma=5, opts=None):
-        self.P_mean = P_mean
-        self.P_std = P_std
+        self.P_mean = P_mean    # -1.2
+        self.P_std = P_std  # 1.2
         self.sigma_data = sigma_data
         self.hid_dim = hid_dim
         self.gamma = gamma
@@ -151,17 +151,17 @@ class EDMLoss:
 
     def __call__(self, denoise_fn, data):
 
-        rnd_normal = torch.randn(data.shape[0], device=data.device)
-        sigma = (rnd_normal * self.P_std + self.P_mean).exp()
+        rnd_normal = torch.randn(data.shape[0], device=data.device)     # 4096
+        sigma = (rnd_normal * self.P_std + self.P_mean).exp()           # 4096
 
         weight = (sigma ** 2 + self.sigma_data ** 2) / (sigma * self.sigma_data) ** 2
 
         y = data
-        n = torch.randn_like(y) * sigma.unsqueeze(1)
-        D_yn = denoise_fn(y + n, sigma)
+        n = torch.randn_like(y) * sigma.unsqueeze(1)    # noise
+        D_yn = denoise_fn(y + n, sigma)         # 4096 x 96
     
         target = y
-        loss = weight.unsqueeze(1) * ((D_yn - target) ** 2)
+        loss = weight.unsqueeze(1) * ((D_yn - target) ** 2) # weighted # 4096 x 96
 
         return loss
 

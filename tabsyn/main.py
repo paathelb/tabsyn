@@ -17,19 +17,19 @@ warnings.filterwarnings('ignore')
 def main(args): 
     device = args.device
 
-    train_z, _, _, ckpt_path, _ = get_input_train(args)
+    train_z, _, _, ckpt_path, _ = get_input_train(args)     # 27000x96
 
     print(ckpt_path)
 
     if not os.path.exists(ckpt_path):
         os.makedirs(ckpt_path)
 
-    in_dim = train_z.shape[1] 
+    in_dim = train_z.shape[1] # value 96
 
-    mean, std = train_z.mean(0), train_z.std(0)
+    mean, std = train_z.mean(0), train_z.std(0) # 96
 
-    train_z = (train_z - mean) / 2
-    train_data = train_z
+    train_z = (train_z - mean) / 2      # Why (sort of) normalize?
+    train_data = train_z    # Use the latent data as training data  # 27000x96
 
 
     batch_size = 4096
@@ -66,7 +66,7 @@ def main(args):
         batch_loss = 0.0
         len_input = 0
         for batch in pbar:
-            inputs = batch.float().to(device)
+            inputs = batch.float().to(device)       # 4096x96
             loss = model(inputs)
         
             loss = loss.mean()
@@ -80,8 +80,8 @@ def main(args):
 
             pbar.set_postfix({"Loss": loss.item()})
 
-        curr_loss = batch_loss/len_input
-        scheduler.step(curr_loss)
+        curr_loss = batch_loss/len_input        # average batch loss
+        scheduler.step(curr_loss)   # update the learning rate of optimizer
 
         if curr_loss < best_loss:
             best_loss = loss.item()
