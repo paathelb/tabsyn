@@ -52,7 +52,7 @@ def compute_loss(X_num, X_cat, Recon_X_num, Recon_X_cat, mu_z, logvar_z, mu_pret
     # Deviation from Major Distribution Loss            # changed by HP
     mu_pretrained = mu_pretrained.unsqueeze(0).repeat(mu_z.shape[0],1,1)
     std_factor = 3
-    # import pdb; pdb.set_trace()
+    
     if label is not None:
         # Why not norm .mean()
         dmd_loss = torch.max(std_factor * std_pretrained.mean() - torch.norm(mu_z-mu_pretrained, p=2, dim=(1,2), keepdim=True).mean(), torch.zeros_like(mu_z)) * label.unsqueeze(1).unsqueeze(2).repeat(1,mu_pretrained.shape[1],1)
@@ -116,20 +116,24 @@ def main(args):
         num_workers = 4,
     )
 
-    model = Model_VAE(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR, bias = True)
+    # changed by HP
+    model = Model_VAE(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR, bias = True, encoder_downsampling=args.encoder_downsampling)
     model = model.to(device)
 
     # changed by HP
-    model_checkpoint_path = '/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/major_only/model.pt'                    # hard coded
-    if os.path.isfile(model_checkpoint_path):
+    load_ckpt = True
+    model_checkpoint_path = '/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/major_only_1_dim_z/model.pt'                    # hard coded
+    if load_ckpt and os.path.isfile(model_checkpoint_path):
         print("LOADING MODEL CHECKPOINT")
         model.load_state_dict(torch.load(model_checkpoint_path))
-        train_z_major = np.load('/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/major_only/train_z_major.npy')      # 21031 x 2 x 4
+        # changed by HP
+        train_z_major = np.load('/home/hpaat/imbalanced_data/tabsyn/tabsyn/vae/ckpt/default/major_only_1_dim_z/train_z_major.npy')      # 21031 x 2 x 4
         train_z_major = torch.from_numpy(train_z_major).cuda()
         mu_pretrained = train_z_major.mean(0)   # 24 x 4
         std_pretrained = train_z_major.std(0)   # 24 x 4
 
-    pre_encoder = Encoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR).to(device)
+    # changed by HP
+    pre_encoder = Encoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR, encoder_downsampling=args.encoder_downsampling).to(device)
     pre_decoder = Decoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR).to(device)
 
     pre_encoder.eval()

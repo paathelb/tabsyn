@@ -43,7 +43,7 @@ def preprocess(dataset_path, task_type = 'binclass', inverse = False, cat_encodi
     )
 
     # changed by HP - only consider training data on major class (for default data)
-    train_on_major_only = True
+    train_on_major_only = False
     if train_on_major_only:
         # Set concat to False
         dataset = make_dataset(
@@ -64,7 +64,7 @@ def preprocess(dataset_path, task_type = 'binclass', inverse = False, cat_encodi
         dataset.y['train'] = dataset.y['train'][major_idx]
 
     # changed by HP - only consider training data on minor class (for default data)
-    train_on_minor_only = False
+    train_on_minor_only = True
     if train_on_minor_only:
         dataset = make_dataset(
             data_path = dataset_path,

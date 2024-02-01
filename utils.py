@@ -102,6 +102,7 @@ def get_args():
     parser.add_argument('--cond_size', type=int, help='cond_size')
     parser.add_argument('--output_size', type=int, help='output_size')
     parser.add_argument('--activation', type=str, default='relu', help='activation')
+    parser.add_argument('--encoder_downsampling', action='store_true', help='Enable Transformer encoder to downsample') #changed by HP
 
     # Training
     parser.add_argument('--training_batch_size', type=int, default=4096, help='batch size')

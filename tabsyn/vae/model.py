@@ -167,7 +167,8 @@ class Transformer(nn.Module):
         residual_dropout = 0.0,
         activation = 'relu',
         prenormalization = True,
-        initialization = 'kaiming',      
+        initialization = 'kaiming', 
+        encoder_downsampling = False, # changed by HP     
     ):
         super().__init__()
 
@@ -203,6 +204,11 @@ class Transformer(nn.Module):
         self.ffn_dropout = ffn_dropout
         self.residual_dropout = residual_dropout
         self.head = nn.Linear(d_token, d_out)
+
+        # changed by HP
+        self.encoder_downsampling = encoder_downsampling
+        if encoder_downsampling:
+            self.nn_z = nn.Linear(96, 1)
 
 
     def _start_residual(self, x, layer, norm_idx):
@@ -241,6 +247,11 @@ class Transformer(nn.Module):
                 x_residual = F.dropout(x_residual, self.ffn_dropout, self.training)
             x_residual = layer['linear1'](x_residual)
             x = self._end_residual(x, x_residual, layer, 1)
+
+        # changed by HP
+        if self.encoder_downsampling:
+            x = x.reshape(x.shape[0], -1)
+            x = self.nn_z(x)
         return x
 
 
@@ -266,7 +277,7 @@ class AE(nn.Module):
         return h
 
 class VAE(nn.Module):
-    def __init__(self, d_numerical, categories, num_layers, hid_dim, n_head = 1, factor = 4, bias = True):
+    def __init__(self, d_numerical, categories, num_layers, hid_dim, n_head = 1, factor = 4, bias = True, encoder_downsampling=False):
         super(VAE, self).__init__()
  
         self.d_numerical = d_numerical
@@ -277,8 +288,11 @@ class VAE(nn.Module):
  
         self.Tokenizer = Tokenizer(d_numerical, categories, d_token, bias = bias)
 
-        self.encoder_mu = Transformer(num_layers, hid_dim, n_head, hid_dim, factor)
-        self.encoder_logvar = Transformer(num_layers, hid_dim, n_head, hid_dim, factor)
+        self.encoder_mu = Transformer(num_layers, hid_dim, n_head, hid_dim, factor, encoder_downsampling=encoder_downsampling)  # changed by HP
+        self.encoder_logvar = Transformer(num_layers, hid_dim, n_head, hid_dim, factor, encoder_downsampling=encoder_downsampling) # changed by HP
+
+        # changed by HP
+        self.nn_z_inverse = nn.Linear(1, 96)
 
         self.decoder = Transformer(num_layers, hid_dim, n_head, hid_dim, factor)
 
@@ -292,15 +306,29 @@ class VAE(nn.Module):
 
     def forward(self, x_num, x_cat):
         x = self.Tokenizer(x_num, x_cat)        # 4096x25x4
-
+        
         mu_z = self.encoder_mu(x)               # 4096x25x4 real
         std_z = self.encoder_logvar(x)          # 4096x25x4 real
+        # import pdb; pdb.set_trace()
+        # changed by HP
+        downsample = False
+        if downsample:
+            # reshape
+            mu_z, std_z = mu_z.reshape(mu_z.shape[0], -1), std_z.reshape(mu_z.shape[0], -1)
+            # feed to a neural network such that 4096 x 1
+            mu_z = self.nn_mu_z(mu_z)
+            std_z = self.nn_std_z(std_z)
+            
+            # change the decoder to make its input 4096x1
+            z = self.reparameterize(mu_z, std_z)            # 4096x1
 
-        z = self.reparameterize(mu_z, std_z)    # 4096x25x4
+            z = self.nn_z_inverse(z).reshape(mu_z.shape[0], -1, 4)
+        else:
+            z = self.reparameterize(mu_z, std_z)            # 4096x25x4
 
-        
+        z = self.nn_z_inverse(z).reshape(mu_z.shape[0], -1, 4)
         batch_size = x_num.size(0)
-        h = self.decoder(z[:,1:])               # 4096x24x4
+        h = self.decoder(z[:,1:])                   # 4096x24x4
         
         return h, mu_z, std_z
 
@@ -336,10 +364,10 @@ class Reconstructor(nn.Module):
 
 
 class Model_VAE(nn.Module):
-    def __init__(self, num_layers, d_numerical, categories, d_token, n_head = 1, factor = 4,  bias = True):
+    def __init__(self, num_layers, d_numerical, categories, d_token, n_head = 1, factor = 4,  bias = True, encoder_downsampling=False):
         super(Model_VAE, self).__init__()
 
-        self.VAE = VAE(d_numerical, categories, num_layers, d_token, n_head = n_head, factor = factor, bias = bias)
+        self.VAE = VAE(d_numerical, categories, num_layers, d_token, n_head = n_head, factor = factor, bias = bias, encoder_downsampling=encoder_downsampling)
         self.Reconstructor = Reconstructor(d_numerical, categories, d_token)            # is this the decoder?
 
     def get_embedding(self, x_num, x_cat):
@@ -348,19 +376,19 @@ class Model_VAE(nn.Module):
 
     def forward(self, x_num, x_cat):
 
-        h, mu_z, std_z = self.VAE(x_num, x_cat) # B x 24 x 4
+        h, mu_z, std_z = self.VAE(x_num, x_cat)                     # B x 24 x 4
 
         # recon_x_num, recon_x_cat = self.Reconstructor(h[:, 1:])
         recon_x_num, recon_x_cat = self.Reconstructor(h)
 
-        return recon_x_num, recon_x_cat, mu_z, std_z        # 4096x14x4, 4096x10x4, 4096x25x4, 4096x25x4
+        return recon_x_num, recon_x_cat, mu_z, std_z                # 4096x14x4, 4096x10x4, 4096x25x4, 4096x25x4
 
 
 class Encoder_model(nn.Module):
-    def __init__(self, num_layers, d_numerical, categories, d_token, n_head, factor, bias = True):
+    def __init__(self, num_layers, d_numerical, categories, d_token, n_head, factor, bias = True, encoder_downsampling=False):
         super(Encoder_model, self).__init__()
         self.Tokenizer = Tokenizer(d_numerical, categories, d_token, bias)
-        self.VAE_Encoder = Transformer(num_layers, d_token, n_head, d_token, factor)
+        self.VAE_Encoder = Transformer(num_layers, d_token, n_head, d_token, factor, encoder_downsampling=encoder_downsampling)
 
     def load_weights(self, Pretrained_VAE):
         self.Tokenizer.load_state_dict(Pretrained_VAE.VAE.Tokenizer.state_dict())

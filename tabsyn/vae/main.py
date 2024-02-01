@@ -104,7 +104,7 @@ def main(args):
         num_workers = 4,
     )
 
-    model = Model_VAE(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR, bias = True)
+    model = Model_VAE(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR, bias = True, encoder_downsampling=args.encoder_downsampling)      # changed by HP
     model = model.to(device)
 
     import pdb; pdb.set_trace()
@@ -115,7 +115,8 @@ def main(args):
         print("NOTE: LOADING TRAINED MODEL CHECKPOINT")
         model.load_state_dict(torch.load(model_checkpoint_path))
 
-    pre_encoder = Encoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR).to(device)
+    # changed by HP
+    pre_encoder = Encoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR, encoder_downsampling=args.encoder_downsampling).to(device)
     pre_decoder = Decoder_model(NUM_LAYERS, d_numerical, categories, D_TOKEN, n_head = N_HEAD, factor = FACTOR).to(device)
 
     pre_encoder.eval()
@@ -192,7 +193,7 @@ def main(args):
                     beta = beta * lambd
 
         '''
-            Evaluation (changed by HP: every epoch?)
+            Evaluation
         '''
         model.eval()
         with torch.no_grad():
